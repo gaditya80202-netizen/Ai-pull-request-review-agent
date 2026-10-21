@@ -1,0 +1,35 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets and environment variables
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Frontend
+node_modules/
+.next/
+dist/
+
+# Local data and logs
+.cache/
+*.log
+
+# OS files
+.DS_Store
+
+# Fedora KDE / Dolphin
+.directory
+
+# Editor temporary and swap files
+*.swp
+*.kate-swp
