@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+arq
+redis
+asyncpg
+pydantic-settings
+httpx
+openai
+PyJWT[crypto]
+tenacity
+langgraph
+langgraph-checkpoint-postgres
+psycopg[binary,pool]
+pytest
+pytest-asyncio
+ruff
