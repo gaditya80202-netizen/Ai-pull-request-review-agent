@@ -9,8 +9,7 @@ openai
 PyJWT[crypto]
 tenacity
 langgraph
-langgraph-checkpoint-postgres
-psycopg[binary,pool]
+langgraph-checkpoint-redis
 pytest
 pytest-asyncio
 ruff
