@@ -6,20 +6,38 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.core.settings import settings
+from backend.memory.tiger_client import TimescaleClient
 from backend.webhook_receiver.router import router as github_webhook_router
+from backend.hitl.router import router as hitl_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.arq_pool = await create_pool(
-        RedisSettings.from_dsn(settings.redis_url)
-    )
+    tiger_client = TimescaleClient()
+    arq_pool = None
 
     try:
+        await tiger_client.connect()
+        arq_pool = await create_pool(
+            RedisSettings.from_dsn(settings.redis_url)
+        )
+
+        app.state.tiger_client = tiger_client
+        app.state.db_pool = tiger_client.pool
+        app.state.arq_pool = arq_pool
+
         yield
     finally:
-        await app.state.arq_pool.aclose()
-
+        try:
+            if arq_pool is not None:
+                await arq_pool.aclose()
+        finally:
+            try:
+                await tiger_client.close()
+            finally:
+                app.state.tiger_client = None
+                app.state.db_pool = None
+                app.state.arq_pool = None
 
 app = FastAPI(
     title="AI Pull-Request Review Agent",
@@ -28,6 +46,7 @@ app = FastAPI(
 )
 
 app.include_router(github_webhook_router)
+app.include_router(hitl_router)
 
 
 class DemoJobRequest(BaseModel): #FastAPI validates the JSON using our Pydantic model

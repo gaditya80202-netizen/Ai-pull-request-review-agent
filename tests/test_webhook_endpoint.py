@@ -44,15 +44,50 @@ class FakeARQPool:
         return FakeJob(_job_id)
 
 
+class FakeInboxDatabase:
+    def __init__(self):
+        self.deliveries = {}
+
+    async def fetch(self, query, *args):
+        if "INSERT INTO webhook_inbox" in query:
+            delivery_id = args[0]
+
+            if delivery_id in self.deliveries:
+                return []
+
+            record = {
+                "delivery_id": delivery_id,
+                "status": "pending",
+                "attempts": 0,
+                "last_attempt_at": None,
+            }
+            self.deliveries[delivery_id] = record
+            return [dict(record)]
+
+        if "FROM webhook_inbox" in query:
+            delivery_id = args[0]
+            record = self.deliveries.get(delivery_id)
+            return [dict(record)] if record else []
+
+        raise AssertionError("Unexpected inbox query in test")
+
+    async def execute(self, query, *args):
+        raise AssertionError("Unexpected inbox write in route test")
+
+
 @pytest.fixture
 def webhook_client(monkeypatch):
     old_pool = getattr(app.state, "arq_pool", None)
+    old_database = getattr(app.state, "tiger_client", None)
+
     pool = FakeARQPool()
+    database = FakeInboxDatabase()
 
     monkeypatch.setattr(
         settings, "github_webhook_secret", TEST_SECRET
     )
     app.state.arq_pool = pool
+    app.state.tiger_client = database
 
     client = TestClient(app)
     yield client, pool
@@ -64,6 +99,12 @@ def webhook_client(monkeypatch):
             delattr(app.state, "arq_pool")
     else:
         app.state.arq_pool = old_pool
+
+    if old_database is None:
+        if hasattr(app.state, "tiger_client"):
+            delattr(app.state, "tiger_client")
+    else:
+        app.state.tiger_client = old_database
 
 
 def make_payload(action="opened"):
@@ -116,7 +157,7 @@ def test_valid_pr_webhook_enqueues_review(webhook_client):
 
     function, args, job_id = pool.enqueued[0]
     assert function == "run_review"
-    assert job_id == f"github-{DELIVERY_ID}"
+    assert job_id == f"github-{DELIVERY_ID}-a1"
 
     job = args[0]
     assert job["repo"] == "demo-owner/demo-repo"
@@ -154,6 +195,59 @@ def test_unsupported_pr_action_is_ignored(webhook_client):
     client, pool = webhook_client
 
     response = send_webhook(client, make_payload("closed"))
+
+    assert response.status_code == 202
+    assert response.json()["ignored"] is True
+    assert len(pool.enqueued) == 0
+
+
+def make_push_payload(branch="main"):
+    return {
+        "ref": f"refs/heads/{branch}",
+        "before": "0" * 40,
+        "after": "a" * 40,
+        "deleted": False,
+        "installation": {"id": 123},
+        "repository": {
+            "full_name": "demo-owner/demo-repo",
+            "default_branch": "main",
+        },
+    }
+
+
+def send_push_webhook(client, payload):
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    headers = signed_headers(body)
+    headers["x-github-event"] = "push"
+    return client.post(
+        "/webhook/github",
+        content=body,
+        headers=headers,
+    )
+
+
+def test_default_branch_push_queues_reindex_job(webhook_client):
+    client, pool = webhook_client
+
+    response = send_push_webhook(client, make_push_payload())
+
+    assert response.status_code == 202
+    assert response.json()["queued"] is True
+    assert len(pool.enqueued) == 1
+
+    function, args, job_id = pool.enqueued[0]
+    assert function == "reindex_repo"
+    assert job_id == f"github-{DELIVERY_ID}-a1"
+    assert args[0]["repo"] == "demo-owner/demo-repo"
+    assert args[0]["ref"] == "refs/heads/main"
+    assert args[0]["head_sha"] == "a" * 40
+    assert args[0]["inbox_managed"] is True
+
+
+def test_non_default_branch_push_is_ignored(webhook_client):
+    client, pool = webhook_client
+
+    response = send_push_webhook(client, make_push_payload("feature"))
 
     assert response.status_code == 202
     assert response.json()["ignored"] is True

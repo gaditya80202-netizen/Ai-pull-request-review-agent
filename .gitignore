@@ -33,3 +33,6 @@ dist/
 # Editor temporary and swap files
 *.swp
 *.kate-swp
+
+# Generated evaluation reports
+backend/evaluation/results/
