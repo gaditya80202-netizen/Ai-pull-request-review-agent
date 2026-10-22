@@ -6,11 +6,11 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.core.settings import settings
+from backend.webhook_receiver.router import router as github_webhook_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create the ARQ connection pool when the API starts.
     app.state.arq_pool = await create_pool(
         RedisSettings.from_dsn(settings.redis_url)
     )
@@ -18,7 +18,6 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        # Close the connection pool when the API shuts down.
         await app.state.arq_pool.aclose()
 
 
@@ -28,8 +27,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(github_webhook_router)
 
-class DemoJobRequest(BaseModel):
+
+class DemoJobRequest(BaseModel): #FastAPI validates the JSON using our Pydantic model
     message: str = Field(min_length=1, max_length=500)
 
 
@@ -52,10 +53,7 @@ async def enqueue_demo_job(
     )
 
     if job is None:
-        raise HTTPException(
-            status_code=503,
-            detail="The job was not enqueued.",
-        )
+        raise HTTPException(503, "The job was not enqueued")
 
     return {
         "status": "queued",
