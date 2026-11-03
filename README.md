@@ -1,18 +1,17 @@
 # 🤖 AI Pull-Request Review Agent
 
 <p align="center">
-  **An AI-powered code review system for GitHub Pull Requests**
-  <br />
+  <strong>An AI-powered code review system for GitHub Pull Requests</strong><br>
   Analyze code changes, detect potential issues, and keep a human in control of every published review.
 </p>
 
 <p align="center">
-  ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
-  ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)
-  ![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-1C3C3C)
-  ![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE)
-  ![Redis](https://img.shields.io/badge/Redis-Job_Queue-DC382D?logo=redis&logoColor=white)
-  ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/LangGraph-Orchestration-1C3C3C" alt="LangGraph">
+  <img src="https://img.shields.io/badge/LLM-DeepSeek-4D6BFE" alt="DeepSeek">
+  <img src="https://img.shields.io/badge/Redis-Job_Queue-DC382D?logo=redis&logoColor=white" alt="Redis">
+  <img src="https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
 </p>
 
 <p align="center">
