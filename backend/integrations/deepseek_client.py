@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import json
@@ -10,9 +11,12 @@ from pydantic import BaseModel, ValidationError
 
 from backend.core.settings import settings
 
-
 T = TypeVar("T", bound=BaseModel)
 
+
+# Maximum serialized request size, including correction prompt
+# and conservative chat-message framing overhead.
+MAX_REQUEST_BYTES = 128 * 1024
 
 # Conservative allowance for chat-message framing and request metadata.
 REQUEST_OVERHEAD_BYTES = 512
@@ -29,25 +33,26 @@ CORRECTION_PROMPT = (
 def validate_request_input_size(
     system_text: str,
     user_text: str,
-    max_context_tokens: int,
+    max_request_bytes: int,
 ) -> int:
-    """Fail closed when UTF-8 request size exceeds the configured limit.
+    """Fail closed when UTF-8 request size exceeds the byte limit.
 
     This is a conservative byte-size guard, not an exact tokenizer.
-    The configured limit must accommodate the complete prompt and a
-    possible correction attempt before the API call begins.
+    The complete prompt, schema, correction allowance and metadata
+    must fit within the configured request-size ceiling.
     """
 
     if (
-        not isinstance(max_context_tokens, int)
-        or isinstance(max_context_tokens, bool)
-        or max_context_tokens <= REQUEST_OVERHEAD_BYTES
+        not isinstance(max_request_bytes, int)
+        or isinstance(max_request_bytes, bool)
+        or max_request_bytes <= REQUEST_OVERHEAD_BYTES
     ):
         raise ValueError(
-            "MAX_CONTEXT_TOKENS must exceed the request overhead allowance."
+            "MAX_REQUEST_BYTES must exceed the request overhead allowance."
         )
 
     correction_bytes = len(CORRECTION_PROMPT.encode("utf-8"))
+
     content_bytes = (
         len(system_text.encode("utf-8"))
         + len(user_text.encode("utf-8"))
@@ -55,16 +60,15 @@ def validate_request_input_size(
         + REQUEST_OVERHEAD_BYTES
     )
 
-    if content_bytes > max_context_tokens:
+    if content_bytes > max_request_bytes:
         raise ValueError(
             "DeepSeek request exceeds the configured conservative input "
             f"size limit ({content_bytes} bytes including overhead; "
-            f"limit {max_context_tokens}). Shorten the diff or repository "
+            f"limit {max_request_bytes}). Shorten the diff or repository "
             "context before retrying."
         )
 
     return content_bytes
-
 
 
 @dataclass
@@ -148,10 +152,11 @@ class DeepSeekClient:
         ]
 
         # Validate before either model attempt can incur API charges.
+        # This byte-size limit is independent of the token budget.
         validate_request_input_size(
             safe_system_text,
             user_text,
-            settings.max_context_tokens,
+            MAX_REQUEST_BYTES,
         )
 
         started = time.perf_counter()
@@ -213,6 +218,7 @@ class DeepSeekClient:
                 usage_complete = False
 
             choices = getattr(response, "choices", None)
+
             try:
                 if not choices:
                     raise ValueError("Response contains no choices.")

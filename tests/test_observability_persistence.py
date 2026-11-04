@@ -5,7 +5,6 @@ import pytest
 
 from backend.observability.persistence import persist_agent_events
 
-
 REVIEW_ID = "11111111-1111-4111-8111-111111111111"
 
 

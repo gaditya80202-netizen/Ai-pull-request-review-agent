@@ -3,14 +3,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.agents.specialist_runner import AGENT_CONFIG
-from backend.integrations.diff_parser import parse_diff
 from backend.models.findings import LLMFinding
 from backend.orchestrator.graph import (
     AGENT_NAMES,
     build_review_graph,
 )
-
 
 DIFF = """\
 diff --git a/example.py b/example.py
@@ -132,6 +129,29 @@ async def test_all_four_agents_run_and_join(monkeypatch):
     assert result["result"]["auto_post_allowed"] is False
     assert result["result"]["auto_post_allowed"] is False
     assert result["result"]["finding_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_verified_head_sha_does_not_add_sha_gate_reason(monkeypatch):
+    async def fake_hybrid_search(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(
+        "backend.orchestrator.retrieval_context.hybrid_search",
+        fake_hybrid_search,
+    )
+
+    calls = set()
+    graph = build_review_graph(make_agents(calls))
+    state = initial_state()
+    state["head_sha_verified"] = True
+
+    result = await graph.ainvoke(state)
+    aggregate_result = result["result"]
+
+    assert "The current pull-request head SHA has not been verified by the caller." not in aggregate_result["gate_reasons"]
+    assert "The evaluation gate has not passed." in aggregate_result["gate_reasons"]
+    assert "Automatic posting is disabled." in aggregate_result["gate_reasons"]
 
 
 @pytest.mark.asyncio

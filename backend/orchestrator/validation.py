@@ -5,7 +5,6 @@ from typing import Any
 
 from backend.integrations.diff_parser import parse_diff
 
-
 SEVERITY_RANK = {
     "INFO": 0,
     "LOW": 1,

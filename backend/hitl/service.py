@@ -7,7 +7,6 @@ The caller must authenticate the reviewer before calling these functions.
 from typing import Any
 from uuid import UUID
 
-
 FINDING_VERDICTS = {
     "true_positive",
     "false_positive",
@@ -64,10 +63,9 @@ async def decide_review(
         "human_approved" if decision == "approved" else "human_rejected"
     )
 
-    async with _pool(database).acquire() as connection:
-        async with connection.transaction():
-            row = await connection.fetchrow(
-                """
+    async with _pool(database).acquire() as connection, connection.transaction():
+        row = await connection.fetchrow(
+            """
                 SELECT
                     h.id::text AS hitl_review_id,
                     h.review_id::text AS review_id,
@@ -78,17 +76,17 @@ async def decide_review(
                 WHERE h.id = $1::uuid
                 FOR UPDATE OF h, r
                 """,
-                hitl_review_id,
-            )
+            hitl_review_id,
+        )
 
-            if row is None:
-                raise LookupError("Human-review request was not found")
+        if row is None:
+            raise LookupError("Human-review request was not found")
 
-            if row["hitl_status"] != "pending":
-                raise ValueError("Human-review request is already decided")
+        if row["hitl_status"] != "pending":
+            raise ValueError("Human-review request is already decided")
 
-            changed = await connection.fetchrow(
-                """
+        changed = await connection.fetchrow(
+            """
                 UPDATE hitl_reviews
                 SET status = $2,
                     reviewer = $3,
@@ -97,24 +95,24 @@ async def decide_review(
                   AND status = 'pending'
                 RETURNING id::text AS id
                 """,
-                hitl_review_id,
-                decision,
-                reviewer,
-            )
+            hitl_review_id,
+            decision,
+            reviewer,
+        )
 
-            if changed is None:
-                raise ValueError("Human-review request is already decided")
+        if changed is None:
+            raise ValueError("Human-review request is already decided")
 
-            await connection.execute(
-                """
+        await connection.execute(
+            """
                 UPDATE pr_review_records
                 SET status = $2,
                     updated_at = now()
                 WHERE id = $1::uuid
                 """,
-                row["review_id"],
-                review_status,
-            )
+            row["review_id"],
+            review_status,
+        )
 
     return {
         "hitl_review_id": hitl_review_id,
@@ -153,23 +151,22 @@ async def record_finding_feedback(
             raise ValueError("comment must be at most 2000 characters")
         comment = comment.strip() or None
 
-    async with _pool(database).acquire() as connection:
-        async with connection.transaction():
-            finding = await connection.fetchrow(
-                """
+    async with _pool(database).acquire() as connection, connection.transaction():
+        finding = await connection.fetchrow(
+            """
                 SELECT id::text AS id
                 FROM finding_records
                 WHERE id = $1::uuid
                 FOR KEY SHARE
                 """,
-                finding_id,
-            )
+            finding_id,
+        )
 
-            if finding is None:
-                raise LookupError("Finding was not found")
+        if finding is None:
+            raise LookupError("Finding was not found")
 
-            await connection.execute(
-                """
+        await connection.execute(
+            """
                 INSERT INTO hitl_feedback (
                     finding_id,
                     verdict,
@@ -178,11 +175,11 @@ async def record_finding_feedback(
                 )
                 VALUES ($1::uuid, $2, $3, $4)
                 """,
-                finding_id,
-                verdict,
-                comment,
-                reviewer,
-            )
+            finding_id,
+            verdict,
+            comment,
+            reviewer,
+        )
 
     return {
         "finding_id": finding_id,

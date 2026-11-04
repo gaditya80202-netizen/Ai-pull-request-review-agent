@@ -7,7 +7,6 @@ from backend.orchestrator.validation import (
     validate_and_deduplicate_findings,
 )
 
-
 AGENT_NAMES = ("security", "quality", "tests", "docs")
 
 

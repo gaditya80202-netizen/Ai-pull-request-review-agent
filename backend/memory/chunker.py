@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from backend.security.masking import mask_secrets
 
-
 PYTHON_SYMBOL = re.compile(
     r"^\s*(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)"
 )
@@ -53,12 +52,12 @@ def split_text_into_chunks(
     while start < len(lines):
         end = min(start + chunk_lines, len(lines))
 
-        def render_chunk(stop: int) -> str:
+        def render_chunk(stop: int, chunk_start: int = start) -> str:
             header = (
                 f"# File: {path}\n"
-                f"# Lines: {start + 1}-{stop}\n"
+                f"# Lines: {chunk_start + 1}-{stop}\n"
             )
-            return header + "\n".join(lines[start:stop])
+            return header + "\n".join(lines[chunk_start:stop])
 
         # Respect the character cap without losing source lines.
         while end > start and len(render_chunk(end)) > max_chunk_chars:

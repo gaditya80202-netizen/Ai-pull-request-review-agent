@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from arq import create_pool
 from arq.connections import RedisSettings
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from backend.core.settings import settings
+from backend.hitl.router import router as hitl_router
 from backend.memory.tiger_client import TimescaleClient
 from backend.webhook_receiver.router import router as github_webhook_router
-from backend.hitl.router import router as hitl_router
 
 
 @asynccontextmanager
@@ -78,3 +80,11 @@ async def enqueue_demo_job(
         "status": "queued",
         "job_id": job.job_id,
     }
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard():
+    return FileResponse(
+        Path(__file__).with_name("dashboard.html"),
+        media_type="text/html",
+    )

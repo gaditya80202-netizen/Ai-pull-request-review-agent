@@ -7,8 +7,8 @@ from typing import Any
 
 from backend.core.settings import settings
 from backend.integrations.github_client import (
-    GitHubClient,
     GitHubAPIError,
+    GitHubClient,
 )
 from backend.memory.chunker import split_text_into_chunks
 from backend.memory.embedder import CloudflareEmbeddingClient
@@ -17,7 +17,6 @@ from backend.memory.file_filter import (
     should_index_file,
 )
 from backend.memory.tiger_client import TimescaleClient
-
 
 CHUNK_LINES = 60
 CHUNK_OVERLAP_LINES = 10

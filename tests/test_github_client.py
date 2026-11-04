@@ -10,6 +10,20 @@ from backend.integrations.github_client import GitHubClient
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("event", ["APPROVE", "REQUEST_CHANGES"])
+async def test_post_review_rejects_non_comment_events(event):
+    async with GitHubClient() as client:
+        with pytest.raises(ValueError, match="Only COMMENT reviews"):
+            await client.post_review(
+                "owner/repo",
+                1,
+                "abc123",
+                "Review body",
+                event=event,
+            )
+
+
+@pytest.mark.asyncio
 async def test_app_jwt_is_signed_with_rs256_and_has_valid_claims(
     tmp_path, monkeypatch
 ):

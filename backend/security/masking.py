@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-
 _PRIVATE_KEY = re.compile(
     r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----"
     r".*?"

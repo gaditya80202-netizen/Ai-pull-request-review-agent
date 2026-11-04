@@ -2,7 +2,6 @@ import pytest
 
 from backend.job_queue import webhook_dispatcher as dispatcher
 
-
 DELIVERY_ID = "11111111-1111-4111-8111-111111111111"
 
 

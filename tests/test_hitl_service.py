@@ -7,7 +7,6 @@ from backend.hitl.service import (
     record_finding_feedback,
 )
 
-
 HITL_ID = "11111111-1111-4111-8111-111111111111"
 REVIEW_ID = "22222222-2222-4222-8222-222222222222"
 FINDING_ID = "33333333-3333-4333-8333-333333333333"
@@ -164,7 +163,7 @@ async def test_finding_feedback_is_persisted():
     assert result["recorded"] is True
     assert result["verdict"] == "false_positive"
 
-    query, args = next(
+    _query, args = next(
         (query, args)
         for query, args in conn.calls
         if "INSERT INTO hitl_feedback" in query

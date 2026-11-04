@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from backend.core.settings import settings
 from backend.main import app
 
-
 TEST_SECRET = "webhook-test-secret"
 DELIVERY_ID = "11111111-1111-4111-8111-111111111111"
 

@@ -4,7 +4,6 @@ from typing import Any
 
 from backend.memory.retrieval import hybrid_search
 
-
 MAX_CONTEXT_CHARS = 12_000
 MAX_CONTEXT_CHUNKS = 20
 
@@ -17,7 +16,7 @@ def format_retrieval_context(
     """Format ranked chunks into a bounded context block."""
 
     if not isinstance(max_chars, int) or isinstance(max_chars, bool):
-        raise ValueError("max_chars must be an integer")
+        raise TypeError("max_chars must be an integer")
 
     if not 500 <= max_chars <= 50_000:
         raise ValueError("max_chars must be between 500 and 50000")
@@ -90,7 +89,7 @@ async def retrieve_context_for_review(
     """Run hybrid search and format the results for a review agent."""
 
     if not isinstance(max_chunks, int) or isinstance(max_chunks, bool):
-        raise ValueError("max_chunks must be an integer")
+        raise TypeError("max_chunks must be an integer")
 
     if not 1 <= max_chunks <= MAX_CONTEXT_CHUNKS:
         raise ValueError(

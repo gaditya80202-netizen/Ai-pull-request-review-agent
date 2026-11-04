@@ -8,7 +8,6 @@ from backend.integrations.deepseek_client import DeepSeekClient
 from backend.integrations.diff_parser import parse_diff
 from backend.models.findings import Finding, LLMFindingList
 
-
 AgentType = Literal["security", "quality", "tests", "docs"]
 
 AGENT_CONFIG: dict[AgentType, tuple[str, str]] = {

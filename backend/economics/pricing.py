@@ -5,12 +5,11 @@ as cache misses for estimation, even when the provider might bill less.
 Recheck the official DeepSeek pricing page when updating these constants.
 """
 
-from decimal import Decimal, ROUND_CEILING
+from decimal import ROUND_CEILING, Decimal
 
 from backend.core.settings import settings
 
-
-MILLION = Decimal("1000000")
+MILLION = Decimal(1000000)
 COST_QUANTUM = Decimal("0.00000001")
 RESERVATION_QUANTUM = Decimal("0.000001")
 

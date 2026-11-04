@@ -3,7 +3,6 @@ import hmac
 
 from backend.webhook_receiver.validator import valid_signature
 
-
 SECRET = "unit-test-secret"
 
 

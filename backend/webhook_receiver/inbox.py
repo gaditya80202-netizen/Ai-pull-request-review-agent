@@ -3,7 +3,6 @@
 import json
 from typing import Any
 
-
 MAX_DELIVERY_ATTEMPTS = 5
 STALE_PROCESSING_MINUTES = 15
 
@@ -23,7 +22,7 @@ async def record_delivery(
     """Insert a delivery once, returning its existing state on duplicates."""
 
     if not isinstance(payload, dict):
-        raise ValueError("Webhook payload must be a dictionary.")
+        raise TypeError("Webhook payload must be a dictionary.")
 
     inserted = await database.fetch(
         """

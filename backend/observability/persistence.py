@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 from backend.economics.pricing import calculate_cost_usd
 
-
 AGENT_NAMES = ("security", "quality", "tests", "docs")
 
 

@@ -7,7 +7,6 @@ from backend.core.settings import settings
 from backend.memory.embedder import CloudflareEmbeddingClient
 from backend.memory.tiger_client import TimescaleClient
 
-
 RRF_K = 60
 MAX_TOP_K = 50
 MAX_CANDIDATE_K = 200
@@ -117,13 +116,13 @@ async def hybrid_search(
         raise ValueError("query must be at most 8,000 characters")
 
     if not isinstance(top_k, int) or isinstance(top_k, bool):
-        raise ValueError("top_k must be an integer")
+        raise TypeError("top_k must be an integer")
 
     if not 1 <= top_k <= MAX_TOP_K:
         raise ValueError(f"top_k must be between 1 and {MAX_TOP_K}")
 
     if not isinstance(candidate_k, int) or isinstance(candidate_k, bool):
-        raise ValueError("candidate_k must be an integer")
+        raise TypeError("candidate_k must be an integer")
 
     if not top_k <= candidate_k <= MAX_CANDIDATE_K:
         raise ValueError(

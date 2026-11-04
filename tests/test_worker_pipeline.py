@@ -24,7 +24,6 @@ def mock_worker_budget(monkeypatch):
 
 from backend.job_queue import arq_worker as worker
 
-
 HEAD_SHA = "a" * 40
 REVIEW_ID = "11111111-1111-4111-8111-111111111111"
 
@@ -185,7 +184,7 @@ async def test_superseded_pr_job_is_not_reviewed(monkeypatch):
     )
 
     assert result["status"] == "superseded"
-    assert result["auto_posted"] if "auto_posted" in result else True
+    assert result.get("auto_posted", True)
     assert result["live_head_sha"] == "b" * 40
 
 

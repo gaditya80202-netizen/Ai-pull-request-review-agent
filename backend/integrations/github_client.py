@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import time
 import base64
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, Self
 from urllib.parse import quote
 
 import httpx
@@ -29,7 +29,7 @@ class GitHubTransientError(GitHubAPIError):
 class GitHubClient:
     BASE_URL = "https://api.github.com"
     TOKEN_CACHE_SECONDS = 50 * 60
-    RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+    RETRYABLE_STATUS_CODES: ClassVar[set[int]] = {429, 500, 502, 503, 504}
 
     def __init__(self) -> None:
         self._http = httpx.AsyncClient(
@@ -44,7 +44,7 @@ class GitHubClient:
         self._installation_token: str | None = None
         self._token_valid_until = 0.0
 
-    async def __aenter__(self) -> GitHubClient:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, exc_type, exc, traceback) -> None:
@@ -519,8 +519,10 @@ class GitHubClient:
             raise ValueError("A commit SHA is required.")
         if not body.strip():
             raise ValueError("The review body cannot be empty.")
-        if event not in {"COMMENT", "APPROVE", "REQUEST_CHANGES"}:
-            raise ValueError("Unsupported GitHub review event.")
+        if event != "COMMENT":
+            raise ValueError(
+                "Only COMMENT reviews are permitted by publication policy."
+            )
 
         payload: dict[str, Any] = {
             "commit_id": commit_sha,

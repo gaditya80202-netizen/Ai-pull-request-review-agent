@@ -4,13 +4,11 @@ import json
 import logging
 from typing import Any
 
-from backend.core.settings import settings
 from backend.webhook_receiver.inbox import (
     get_delivery,
     list_retryable_deliveries,
     mark_delivery,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +79,7 @@ def _reindex_job_payload(delivery: dict[str, Any]):
     installation = payload.get("installation") or {}
 
     if not isinstance(repository, dict) or not isinstance(installation, dict):
-        raise ValueError("Malformed push inbox payload.")
+        raise TypeError("Malformed push inbox payload.")
 
     repo = repository.get("full_name")
     default_branch = repository.get("default_branch")

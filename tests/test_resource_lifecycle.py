@@ -1,7 +1,7 @@
 import pytest
 
-import backend.main as main_module
 import backend.job_queue.arq_worker as worker_module
+import backend.main as main_module
 
 
 class FakeDatabaseClient:

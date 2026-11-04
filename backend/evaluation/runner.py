@@ -4,7 +4,8 @@ import argparse
 import asyncio
 import hashlib
 import json
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -30,6 +31,7 @@ from backend.evaluation.cases import (
 from backend.evaluation.scoring import score_case, summarize_scores
 from backend.memory.tiger_client import TimescaleClient
 
+logger = logging.getLogger(__name__)
 
 AGENTS = {
     "security": review_security,
@@ -48,7 +50,7 @@ def _write_report(payload: dict) -> Path:
     directory = Path(__file__).resolve().parent / "results"
     directory.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_short_id = payload["run_id"].replace("-", "")[:8]
     path = directory / f"evaluation_{timestamp}_{run_short_id}.json"
     path.write_text(
@@ -111,7 +113,7 @@ async def _run_live() -> int:
     )
 
     run_uuid = uuid4()
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     head_sha = hashlib.sha1(run_uuid.bytes).hexdigest()
     delivery_id = f"eval-{run_uuid.hex}"
 
@@ -138,7 +140,7 @@ async def _run_live() -> int:
     settlement_done = False
     api_attempted = False
     usage_complete = True
-    total_reported_cost = Decimal("0")
+    total_reported_cost = Decimal(0)
     case_scores = []
 
     try:
@@ -188,7 +190,7 @@ async def _run_live() -> int:
                 review_id,
                 report["status"],
             )
-            report["finished_at"] = datetime.now(timezone.utc).isoformat()
+            report["finished_at"] = datetime.now(UTC).isoformat()
             path = _write_report(report)
             print(f"Budget reservation denied: {reservation.reason}")
             print("No model calls were made.")
@@ -246,7 +248,7 @@ async def _run_live() -> int:
                         "score": score,
                     })
 
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     # A failed request may still have incurred a charge.
                     # Stop and settle the full reservation conservatively.
                     usage_complete = False
@@ -325,7 +327,7 @@ async def _run_live() -> int:
                     else "Calculated from aggregated provider token usage."
                 ),
             }
-            report["finished_at"] = datetime.now(timezone.utc).isoformat()
+            report["finished_at"] = datetime.now(UTC).isoformat()
             path = _write_report(report)
 
             print(f"\nStatus: {final_status}")
@@ -359,18 +361,24 @@ async def _run_live() -> int:
                     review_id,
                     "evaluation_interrupted",
                 )
-            except Exception:
-                pass
+            except Exception as cleanup_exc:  # noqa: BLE001
+                logger.warning(
+                    "Could not mark interrupted evaluation in database: %s",
+                    type(cleanup_exc).__name__,
+                )
 
         report["status"] = "evaluation_interrupted"
         report["cases"] = report.get("cases", [])
         report["summary"] = summarize_scores(case_scores)
-        report["finished_at"] = datetime.now(timezone.utc).isoformat()
+        report["finished_at"] = datetime.now(UTC).isoformat()
         try:
             path = _write_report(report)
             print(f"Partial evaluation report: {path}")
-        except Exception:
-            pass
+        except Exception as report_exc:  # noqa: BLE001
+            logger.warning(
+                "Could not write partial evaluation report: %s",
+                type(report_exc).__name__,
+            )
         raise
 
     finally:
@@ -397,7 +405,7 @@ def main() -> None:
     except KeyboardInterrupt:
         print("Evaluation interrupted.")
         raise SystemExit(130) from None
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # Avoid printing database DSNs or other potentially sensitive details.
         print(f"Evaluation failed: {type(exc).__name__}.")
         raise SystemExit(1) from None

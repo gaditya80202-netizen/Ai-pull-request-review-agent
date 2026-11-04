@@ -2,7 +2,6 @@ from backend.orchestrator.validation import (
     validate_and_deduplicate_findings,
 )
 
-
 DIFF = """\
 diff --git a/example.py b/example.py
 index 1111111..2222222 100644

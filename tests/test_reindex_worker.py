@@ -4,7 +4,6 @@ import pytest
 
 from backend.job_queue import arq_worker as worker
 
-
 DELIVERY_ID = "11111111-1111-4111-8111-111111111111"
 SHA = "a" * 40
 

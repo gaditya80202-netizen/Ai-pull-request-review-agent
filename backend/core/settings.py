@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     deepseek_model: str | None = None
     deepseek_thinking: str = "disabled"
     llm_max_output_tokens: int = 4096
-    max_context_tokens: int = 12000
+    max_context_tokens: int = 131072
 
     # Cloudflare Workers AI embeddings
     cloudflare_account_id: str | None = None

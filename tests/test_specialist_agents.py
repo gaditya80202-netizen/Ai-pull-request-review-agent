@@ -6,7 +6,6 @@ from backend.agents.tests_agent import review_tests
 from backend.integrations.deepseek_client import LLMCallResult
 from backend.models.findings import LLMFindingList
 
-
 DIFF = """\
 diff --git a/example.py b/example.py
 index 1111111..2222222 100644

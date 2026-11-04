@@ -36,3 +36,14 @@ dist/
 
 # Generated evaluation reports
 backend/evaluation/results/
+
+# Local editor backups and credential exports
+*.backup
+*.bak
+*credentials*.env*
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+*.dashboard-backup

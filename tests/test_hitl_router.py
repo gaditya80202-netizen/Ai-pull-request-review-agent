@@ -2,12 +2,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.core.settings import settings
-from backend.main import app
 from backend.hitl import router as hitl_router
-
+from backend.main import app
 
 TOKEN = "t" * 48
 HITL_ID = "11111111-1111-4111-8111-111111111111"
+REVIEW_ID = "22222222-2222-4222-8222-222222222222"
 FINDING_ID = "33333333-3333-4333-8333-333333333333"
 
 
@@ -108,6 +108,36 @@ async def test_approval_calls_service_as_configured_reviewer(
 
     monkeypatch.setattr(hitl_router, "decide_review", fake_decide)
 
+    async def fake_head_status(database, hitl_review_id):
+        return {
+            "hitl_review_id": hitl_review_id,
+            "verified": True,
+            "matches": True,
+            "reviewed_head_sha": "a" * 40,
+            "current_head_sha": "a" * 40,
+            "message": "The review matches the current PR head.",
+        }
+
+    monkeypatch.setattr(
+        hitl_router, "_get_live_head_status", fake_head_status
+    )
+    published_ids = []
+
+    async def fake_publish(database, *, hitl_review_id):
+        published_ids.append(hitl_review_id)
+        return {
+            "publication_status": "published",
+            "publication_allowed": True,
+            "publication_event": "COMMENT",
+            "github_review_id": 123,
+            "already_published": False,
+            "review_id": REVIEW_ID,
+            "message": "test publication stub",
+        }
+
+    monkeypatch.setattr(hitl_router, "publish_approved_review", fake_publish)
+
+
     response = client.post(
         f"/api/hitl/reviews/{HITL_ID}/decision",
         headers=auth_headers,
@@ -117,7 +147,8 @@ async def test_approval_calls_service_as_configured_reviewer(
     assert response.status_code == 200
     assert captured["reviewer"] == "operator-1"
     assert captured["decision"] == "approved"
-    assert response.json()["publication_allowed"] is False
+    assert response.json()["publication_allowed"] is True
+    assert published_ids == [HITL_ID]
 
 
 def test_invalid_decision_is_rejected(api_client, auth_headers):
@@ -142,6 +173,28 @@ def test_feedback_endpoint_authenticates(api_client):
 
     assert response.status_code == 401
 
+
+
+def test_reconciliation_rejects_missing_authentication(
+    api_client, monkeypatch
+):
+    from backend.hitl import router as hitl_router
+
+    async def must_not_run(*args, **kwargs):
+        raise AssertionError("Reconciliation must not run without authentication")
+
+    monkeypatch.setattr(
+        hitl_router,
+        "reconcile_approved_review",
+        must_not_run,
+    )
+
+    client, _database = api_client
+    response = client.post(
+        f"/api/hitl/reviews/{HITL_ID}/reconcile"
+    )
+
+    assert response.status_code in (401, 403)
 
 def test_missing_auth_configuration_fails_closed(
     api_client, monkeypatch

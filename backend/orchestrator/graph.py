@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import operator
-from typing import Annotated, Any, Awaitable, Callable, TypedDict
+from collections.abc import Awaitable, Callable
+from typing import Annotated, Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -12,10 +13,8 @@ from backend.agents.quality import review_quality
 from backend.agents.security import review_security
 from backend.agents.tests_agent import review_tests
 from backend.integrations.diff_parser import parse_diff
-from backend.memory.retrieval import hybrid_search
 from backend.orchestrator.retrieval_context import retrieve_context_for_review
 from backend.security.masking import mask_secrets
-
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +37,7 @@ class ReviewState(TypedDict, total=False):
     repo: str
     pr_number: int
     head_sha: str
+    head_sha_verified: bool
 
     diff: str
     touched_paths: list[str]
@@ -132,7 +132,7 @@ async def retrieve_repository_context(
                 installation_id=installation_id,
                 query=query,
                 max_chunks=8,
-                max_context_chars=8000,
+                max_context_chars=24000,
             ),
             timeout=45.0,
         )
@@ -223,7 +223,7 @@ def make_agent_node(
                 "agent_status": {agent_name: status_record},
             }
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(
                 "Specialist %s timed out.", agent_name
             )
@@ -234,13 +234,14 @@ def make_agent_node(
                 "rejected_count": 0,
             }
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Record a safe error class; don't log source text,
             # credentials, prompts, or the exception message.
             logger.error(
-                "Specialist %s failed with %s.",
+                "Specialist %s failed with %s: %s",
                 agent_name,
                 type(exc).__name__,
+                str(exc)[:500],
             )
             status_record = {
                 "status": "failed",

@@ -2,7 +2,6 @@ import pytest
 
 from backend.orchestrator import graph
 
-
 SAMPLE_DIFF = """diff --git a/src/app.py b/src/app.py
 --- a/src/app.py
 +++ b/src/app.py

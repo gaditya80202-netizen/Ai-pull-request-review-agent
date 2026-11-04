@@ -1,9 +1,8 @@
 import pytest
 
+from backend.agents.quality import review_quality
 from backend.integrations.deepseek_client import LLMCallResult
 from backend.models.findings import LLMFindingList
-from backend.agents.quality import review_quality
-
 
 DIFF = """\
 diff --git a/example.py b/example.py

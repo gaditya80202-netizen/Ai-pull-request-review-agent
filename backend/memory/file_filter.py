@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import PurePosixPath
 
-
 ALLOWED_EXTENSIONS = {
     ".py", ".pyi",
     ".md", ".mdx", ".txt", ".rst",
@@ -100,9 +99,4 @@ def should_index_file(
     if not supported:
         return False
 
-    if size is not None and (
-        size < 0 or size > max_file_bytes
-    ):
-        return False
-
-    return True
+    return size is None or 0 <= size <= max_file_bytes

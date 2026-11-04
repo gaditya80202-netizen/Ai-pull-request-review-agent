@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
-
 _HUNK_HEADER = re.compile(
     r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@"
 )

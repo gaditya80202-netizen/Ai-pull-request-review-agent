@@ -1,8 +1,10 @@
+
 from types import SimpleNamespace
 
 import pytest
 from pydantic import BaseModel
 
+import backend.integrations.deepseek_client as deepseek_client_module
 from backend.core.settings import settings
 from backend.integrations.deepseek_client import (
     DeepSeekClient,
@@ -49,14 +51,18 @@ def test_size_guard_counts_utf8_bytes():
 
 @pytest.mark.parametrize("limit", [0, -1, True, 512])
 def test_invalid_limit_is_rejected(limit):
-    with pytest.raises(ValueError, match="MAX_CONTEXT_TOKENS"):
+    with pytest.raises(ValueError, match="MAX_REQUEST_BYTES"):
         validate_request_input_size("system", "user", limit)
 
 
 @pytest.mark.asyncio
 async def test_oversized_request_never_calls_api(monkeypatch):
     monkeypatch.setattr(settings, "deepseek_model", "deepseek-flash")
-    monkeypatch.setattr(settings, "max_context_tokens", 1000)
+    monkeypatch.setattr(
+        deepseek_client_module,
+        "MAX_REQUEST_BYTES",
+        1000,
+    )
     monkeypatch.setattr(settings, "llm_max_output_tokens", 200)
     monkeypatch.setattr(settings, "deepseek_thinking", "disabled")
 

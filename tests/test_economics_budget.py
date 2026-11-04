@@ -5,11 +5,10 @@ from decimal import Decimal
 import pytest
 
 from backend.economics.budget import (
+    release_review_budget,
     reserve_review_budget,
     settle_review_budget,
-    release_review_budget,
 )
-
 
 REVIEW_ID = "11111111-1111-4111-8111-111111111111"
 TODAY = date(2026, 10, 23)
@@ -27,8 +26,8 @@ class FakeConnection:
     def __init__(self, reservation=None, daily=None):
         self.reservation = reservation
         self.daily = daily or {
-            "reserved_usd": Decimal("0"),
-            "actual_usd": Decimal("0"),
+            "reserved_usd": Decimal(0),
+            "actual_usd": Decimal(0),
         }
         self.calls = []
 
@@ -120,7 +119,7 @@ async def test_existing_same_day_reservation_is_idempotent():
     conn = FakeConnection(reservation={
         "budget_day": TODAY,
         "reserved_usd": Decimal("0.10"),
-        "actual_cost_usd": Decimal("0"),
+        "actual_cost_usd": Decimal(0),
         "status": "reserved",
     })
 

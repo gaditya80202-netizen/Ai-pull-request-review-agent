@@ -13,7 +13,6 @@ from backend.webhook_receiver.inbox import (
 )
 from backend.webhook_receiver.validator import valid_signature
 
-
 router = APIRouter()
 HANDLED_PR_ACTIONS = {"opened", "synchronize", "reopened"}
 SHA_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")

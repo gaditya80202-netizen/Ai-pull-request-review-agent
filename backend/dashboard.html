@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI PR Review Console</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#131b2e;--line:#29354d;--text:#e8edf7;--muted:#9aa8bf;--blue:#8bb8ff;--green:#7ee0b0;--red:#ff9999;--amber:#f1d9a3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,sans-serif}
+button,input{font:inherit}
+button{cursor:pointer;border:1px solid var(--line);border-radius:9px;padding:10px 14px;background:#202c43;color:var(--text);font-weight:600}
+button:disabled{opacity:.5;cursor:wait}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.shell{max-width:1200px;margin:auto;padding:26px 20px}
+header{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+h1{font-size:26px;margin:0}h2{font-size:19px;margin:0 0 12px}h3{font-size:17px;overflow-wrap:anywhere}
+p{color:var(--muted)}.muted{color:var(--muted)}.small{font-size:13px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 18px;border-bottom:1px solid var(--line);padding-bottom:12px}
+nav button{background:transparent}.active{background:#244b82;border-color:#4775b7}
+.panel,.review,.metric{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel{margin:16px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:13px;margin:18px 0}
+.metric span{display:block;color:var(--muted);font-size:13px}.metric strong{display:block;font-size:27px;margin:5px 0;overflow-wrap:anywhere}
+.metric small{color:var(--muted)}.review{margin:14px 0}.review h3{margin:0 0 8px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px;min-width:240px;max-width:100%}
+.primary{background:#244b82}.approve{background:#174d3c}.reject{background:#592b36}
+.warning{border-left:3px solid #d9aa4e;padding:10px 12px;background:#332b1c;color:var(--amber);border-radius:4px}
+.success{color:var(--green)}.error{color:var(--red)}.status{white-space:pre-wrap;margin-top:12px}
+.hidden{display:none!important}code{color:var(--blue);overflow-wrap:anywhere}
+.pill{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:3px 9px;font-size:12px;color:var(--muted)}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th,.data-table td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.data-table th{color:var(--muted);font-weight:600}
+.table-wrap{max-width:100%;overflow-x:auto}
+/* Individual AI findings */
+.findings-panel{
+  margin-top:14px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#0e1729;
+}
+.finding-list{
+  display:grid;
+  gap:12px;
+  margin-top:12px;
+}
+.finding-card{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--panel);
+}
+.finding-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.finding-meta{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  margin:9px 0;
+}
+.finding-severity{
+  display:inline-block;
+  border:1px solid var(--line);
+  border-radius:6px;
+  padding:3px 8px;
+  font-size:12px;
+  font-weight:700;
+}
+.finding-severity.critical{color:#ff9999;border-color:#a34c4c}
+.finding-severity.high{color:#ffbf8a;border-color:#98613e}
+.finding-severity.medium{color:#f1d9a3;border-color:#806d3b}
+.finding-severity.low{color:var(--green);border-color:#397c60}
+.finding-detail{
+  margin:8px 0;
+  overflow-wrap:anywhere;
+}
+.finding-detail strong{color:var(--muted)}
+.finding-text{
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+@media(max-width:600px){.shell{padding:18px 12px}h1{font-size:22px}.panel,.review,.metric{padding:14px}input{min-width:0;width:100%}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header>
+  <div>
+    <h1>AI Pull-Request Review</h1>
+    <p class="small">Human-in-the-loop review console</p>
+  </div>
+  <span class="pill">Human-controlled decisions</span>
+</header>
+
+<nav aria-label="Dashboard pages">
+  <button id="nav-reviews" class="active" type="button">PR Review Queue</button>
+  <button id="nav-analytics" type="button">Analytics</button>
+</nav>
+
+<section class="panel">
+  <h2>Reviewer authentication</h2>
+  <p class="small">Enter the configured HITL API token. It stays in this page's memory and is not saved in browser storage.</p>
+  <div class="row">
+    <input id="token" type="password" autocomplete="off" placeholder="HITL API token" aria-label="HITL API token">
+    <button id="connect" class="primary" type="button">Connect and load</button>
+    <button id="clear" type="button">Clear token</button>
+  </div>
+  <div id="status" class="status" role="status">Not connected.</div>
+</section>
+
+<section id="page-reviews">
+  <div class="row" style="justify-content:space-between">
+    <div><h2>PR Review Queue</h2><p class="small">Review the AI result, inspect the original PR, then record your decision.</p></div>
+    <button id="refresh" type="button">Refresh queue</button>
+  </div>
+  <div class="grid">
+    <div class="metric"><span>Pending human reviews</span><strong id="pending-count">—</strong><small>Current pending queue</small></div>
+    <div class="metric"><span>Publication control</span><strong style="font-size:19px">Human-gated</strong><small>Approval triggers a SHA-checked attempt to publish a GitHub COMMENT review. It does not approve or merge the PR.</small></div>
+  </div>
+  <div id="reviews"><div class="panel muted">Connect to load pending reviews.</div></div>
+</section>
+
+<section id="page-analytics" class="hidden">
+  <div class="row" style="justify-content:space-between">
+    <div>
+      <h2>Analytics overview</h2>
+      <p class="small">Recorded agent-event usage for the last 30 days. Unknown costs and missing usage are not counted as zero.</p>
+    </div>
+    <button id="refresh-analytics" type="button">Refresh analytics</button>
+  </div>
+  <div class="grid">
+    <div class="metric"><span>Known recorded cost (30d)</span><strong id="analytics-spend">Not loaded</strong><small id="analytics-spend-note">Estimated cost from recorded token usage and model pricing.</small></div>
+    <div class="metric"><span>Recorded input tokens</span><strong id="analytics-input">Not loaded</strong><small id="analytics-input-note">Token usage coverage will appear here.</small></div>
+    <div class="metric"><span>Recorded output tokens</span><strong id="analytics-output">Not loaded</strong><small id="analytics-output-note">Token usage coverage will appear here.</small></div>
+    <div class="metric"><span>Reviews awaiting decision</span><strong id="analytics-pending">—</strong><small>Current human-review queue.</small></div>
+    <div class="metric"><span>Known cost per review record</span><strong id="analytics-cost-per-review">Not loaded</strong><small id="analytics-cost-per-review-note">May be incomplete when event costs are unknown.</small></div>
+    <div class="metric"><span>Review records created (30d)</span><strong id="analytics-review-records">Not loaded</strong><small>Counts review records, not necessarily unique PRs.</small></div>
+    <div class="metric"><span>Average agent-event latency</span><strong id="analytics-latency">Not loaded</strong><small id="analytics-latency-note">Across persisted agent events with latency measurements.</small></div>
+  </div>
+  <div class="panel">
+    <h2>Daily usage — last 30 days</h2>
+    <p id="analytics-daily-note" class="small">Connect and load analytics to view daily totals.</p>
+    <div id="analytics-daily" class="table-wrap"></div>
+  </div>
+  <div class="panel">
+    <h2>Review status counts — last 30 days</h2>
+    <p class="small">Statuses are shown as stored in the database; they are not reclassified as success or failure.</p>
+    <div id="analytics-statuses" class="table-wrap"></div>
+  </div>
+</section>
+</main>
+
+<script>
+(() => {
+  let token = "";
+  let currentItems = [];
+  const $ = id => document.getElementById(id);
+
+  const setStatus = (message, kind = "") => {
+    $("status").className = "status " + kind;
+    $("status").textContent = message;
+  };
+
+  const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[c]);
+
+  function showPage(page) {
+    const reviews = page === "reviews";
+    $("page-reviews").classList.toggle("hidden", !reviews);
+    $("page-analytics").classList.toggle("hidden", reviews);
+    $("nav-reviews").classList.toggle("active", reviews);
+    $("nav-analytics").classList.toggle("active", !reviews);
+  }
+
+  async function api(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        "Authorization": "Bearer " + token,
+        ...(options.body ? {"Content-Type":"application/json"} : {}),
+        ...(options.headers || {})
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(
+      typeof data.detail === "string" ? data.detail : `HTTP ${response.status}`
+    );
+    return data;
+  }
+
+  function githubPrUrl(repo, number) {
+    const parts = String(repo ?? "").split("/");
+    if (parts.length !== 2 || !parts.every(p => /^[A-Za-z0-9_.-]+$/.test(p))) return "";
+    const n = Number(number);
+    if (!Number.isSafeInteger(n) || n < 1) return "";
+    return `https://github.com/${parts[0]}/${parts[1]}/pull/${n}`;
+  }
+
+  function appendFindingField(parent, label, value) {
+  const row = document.createElement("p");
+  row.className = "finding-detail";
+
+  const heading = document.createElement("strong");
+  heading.textContent = `${label}: `;
+
+  const content = document.createElement("span");
+  content.className = "finding-text";
+  content.textContent =
+    value === null || value === undefined || value === ""
+      ? "Not provided"
+      : String(value);
+
+  row.append(heading, content);
+  parent.appendChild(row);
+}
+
+function renderFindings(panel, items) {
+  panel.replaceChildren();
+
+  const heading = document.createElement("h3");
+  heading.textContent = `AI Findings (${items.length})`;
+  panel.appendChild(heading);
+
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted small";
+    empty.textContent = "No individual findings were recorded for this review.";
+    panel.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "finding-list";
+
+  for (const item of items) {
+    const finding = document.createElement("article");
+    finding.className = "finding-card";
+
+    const header = document.createElement("div");
+    header.className = "finding-header";
+
+    const title = document.createElement("h3");
+    title.textContent = item.category || "Uncategorized finding";
+
+    const severity = document.createElement("span");
+    const severityValue = String(item.severity || "UNKNOWN");
+    const severityClass = severityValue.toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
+
+    severity.className = `finding-severity ${severityClass}`;
+    severity.textContent = severityValue;
+
+    header.append(title, severity);
+    finding.appendChild(header);
+
+    const meta = document.createElement("div");
+    meta.className = "finding-meta";
+
+    const agent = document.createElement("span");
+    agent.className = "pill";
+    agent.textContent = `${item.agent_type || "Unknown"} agent`;
+
+    const confidence = document.createElement("span");
+    confidence.className = "pill";
+
+    const confidenceValue = item.confidence == null
+      ? null
+      : Number(item.confidence);
+
+    confidence.textContent =
+      confidenceValue !== null && Number.isFinite(confidenceValue)
+        ? `Confidence: ${(confidenceValue * 100).toFixed(1)}%`
+        : "Confidence: Not available";
+
+    meta.append(agent, confidence);
+    finding.appendChild(meta);
+
+    appendFindingField(finding, "Summary", item.summary);
+
+    const file = item.file_path || "File not specified";
+    const line = item.line_start == null
+      ? ""
+      : `:${item.line_start}${item.line_end != null && item.line_end !== item.line_start ? `-${item.line_end}` : ""}`;
+
+    appendFindingField(finding, "Location", file + line);
+    appendFindingField(finding, "Rationale", item.rationale);
+    appendFindingField(finding, "Suggested fix", item.suggestion);
+
+    list.appendChild(finding);
+  }
+
+  panel.appendChild(list);
+}
+
+async function toggleFindings(item, card) {
+  const button = card.querySelector(".findings-toggle");
+  const panel = card.querySelector(".findings-panel");
+
+  const expanded = button.getAttribute("aria-expanded") === "true";
+
+  if (expanded) {
+    panel.classList.add("hidden");
+    button.setAttribute("aria-expanded", "false");
+    button.textContent = `View findings (${item.finding_count ?? 0})`;
+    return;
+  }
+
+  panel.classList.remove("hidden");
+  button.setAttribute("aria-expanded", "true");
+
+  // Findings already loaded for this card: reuse them.
+  if (panel.dataset.loaded === "true") {
+    button.textContent = "Hide findings";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Loading findings…";
+  panel.textContent = "Loading findings from the database…";
+
+  try {
+    const data = await api(
+      `/api/hitl/reviews/${encodeURIComponent(item.hitl_review_id)}/findings`
+    );
+
+    renderFindings(panel, data.items || []);
+    panel.dataset.loaded = "true";
+    button.textContent = "Hide findings";
+  } catch (error) {
+    panel.textContent = `Could not load findings: ${error.message}`;
+    panel.classList.add("hidden");
+    button.setAttribute("aria-expanded", "false");
+    button.textContent = "Retry loading findings";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+  async function checkHeadStatus(item, card) {
+    const warning = card.querySelector(".head-status");
+    const approve = card.querySelector(".approve");
+    approve.disabled = true;
+    warning.className = "warning head-status";
+    warning.textContent = "Checking the current GitHub head SHA…";
+
+    try {
+      const live = await api(
+        `/api/hitl/reviews/${encodeURIComponent(item.hitl_review_id)}/head-status`
+      );
+
+      if (live.verified && live.matches) {
+        warning.className = "success small head-status";
+        warning.textContent =
+          `Live SHA verified: ${live.current_head_sha}. It matches the reviewed commit. The server will check again when you submit approval.`;
+        approve.disabled = false;
+      } else {
+        warning.className = "warning head-status";
+        warning.textContent =
+          `STALE REVIEW: ${live.message || "The current PR head differs from the reviewed commit."} Approval is disabled. Refresh/reindex and review the latest commit before approving.`;
+        approve.disabled = true;
+      }
+      return live;
+    } catch (error) {
+      warning.className = "warning head-status";
+      warning.textContent =
+        `Could not verify the current GitHub head SHA: ${error.message} Approval remains disabled. Refresh the queue to retry.`;
+      approve.disabled = true;
+      return {
+        verified: false,
+        matches: false,
+        message: error.message,
+      };
+    }
+  }
+
+  function renderReviews(items) {
+    $("reviews").replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "panel";
+      empty.textContent = "No pending reviews. The queue is clear.";
+      $("reviews").appendChild(empty);
+      return;
+    }
+
+    for (const item of items) {
+      const card = document.createElement("article");
+      card.className = "review";
+      const prUrl = githubPrUrl(item.repo, item.pr_number);
+      const sha = String(item.head_sha ?? "");
+      const repoParts = String(item.repo ?? "").split("/");
+      const validRepo = repoParts.length === 2 &&
+        repoParts.every(part => /^[A-Za-z0-9_.-]+$/.test(part));
+      const shaUrl = validRepo && /^[a-f0-9]{40}$/i.test(sha)
+        ? `https://github.com/${encodeURIComponent(repoParts[0])}/${encodeURIComponent(repoParts[1])}/commit/${sha}`
+        : "";
+
+      card.innerHTML = `
+        <div class="row" style="justify-content:space-between">
+          <h3>${escapeHtml(item.repo)} · PR #${escapeHtml(item.pr_number)}</h3>
+          <span class="pill">${escapeHtml(item.hitl_status || "pending")}</span>
+        </div>
+        <p>Findings recorded: <strong>${escapeHtml(item.finding_count)}</strong>
+        &nbsp; · &nbsp; Review status: ${escapeHtml(item.review_status)}</p>
+        <p>Review ID: <code>${escapeHtml(item.hitl_review_id)}</code></p>
+        <p>Reviewed commit SHA: <code>${escapeHtml(sha || "Not provided")}</code></p>
+        <p class="reason"><strong>Reason for human review</strong><br>${escapeHtml(item.reason)}</p>
+        <div class="actions">
+          ${prUrl ? `<a href="${prUrl}" target="_blank" rel="noopener noreferrer">Open original PR on GitHub ↗</a>` : ""}
+          ${shaUrl ? `<a href="${shaUrl}" target="_blank" rel="noopener noreferrer">Inspect reviewed commit ↗</a>` : ""}
+        </div>
+
+        <div class="actions">
+          <button class="findings-toggle" type="button" aria-expanded="false">
+            View findings (${escapeHtml(item.finding_count ?? 0)})
+          </button>
+        </div>
+
+        <section class="findings-panel hidden" aria-label="AI review findings"></section>
+
+        <p class="warning head-status" role="status">Checking the current GitHub head SHA…</p>
+        <div class="actions">
+          <button class="approve" type="button" disabled>Approve and attempt publication</button>
+          <button class="reject" type="button">Reject review</button>
+        </div>`;
+
+      card.querySelector(".findings-toggle").addEventListener("click", () => {
+        void toggleFindings(item, card);
+      });  
+      card.querySelector(".approve").addEventListener("click", () => decide(item, "approved", card));
+      card.querySelector(".reject").addEventListener("click", () => decide(item, "rejected", card));
+      $("reviews").appendChild(card);
+      void checkHeadStatus(item, card);
+    }
+  }
+
+  async function loadReviews() {
+    if (!token) {
+      setStatus("Enter your HITL API token first.", "error");
+      return;
+    }
+    $("connect").disabled = $("refresh").disabled = true;
+    setStatus("Loading pending reviews…");
+    try {
+      const data = await api("/api/hitl/reviews/pending");
+      currentItems = data.items || [];
+      const count = data.count ?? currentItems.length;
+      $("pending-count").textContent = count;
+      $("analytics-pending").textContent = count;
+      renderReviews(currentItems);
+      setStatus(`Connected. Loaded ${currentItems.length} pending review(s).`, "success");
+    } catch (error) {
+      setStatus(`Could not load reviews: ${error.message}`, "error");
+      if (/401|403|token/i.test(error.message)) {
+        token = "";
+        $("token").value = "";
+      }
+    } finally {
+      $("connect").disabled = $("refresh").disabled = false;
+    }
+  }
+
+  async function decide(item, decision, card) {
+    if (decision === "approved") {
+      const live = await checkHeadStatus(item, card);
+      if (!live.verified || !live.matches) {
+        setStatus(
+          `Approval blocked: ${live.message || "The current PR head could not be verified."}`,
+          "error"
+        );
+        return;
+      }
+    }
+
+    const confirmation = decision === "approved"
+      ? `Approve the AI review for ${item.repo} PR #${item.pr_number}?\\n\\nThis records the configured human decision and attempts to publish a GitHub COMMENT review after server-side SHA and safety checks. It does not submit a GitHub APPROVE event, merge the PR, or modify code.`
+      : `Reject the review for ${item.repo} PR #${item.pr_number}?\\n\\nThis records the human rejection. It will not publish a GitHub review.`;
+
+    if (!confirm(confirmation)) return;
+
+    let outcome = "";
+    let outcomeKind = "success";
+    try {
+      setStatus(`Recording ${decision} decision…`);
+      const result = await api(
+        `/api/hitl/reviews/${encodeURIComponent(item.hitl_review_id)}/decision`,
+        {method:"POST", body:JSON.stringify({decision})}
+      );
+
+      if (decision === "rejected") {
+        outcome = result.message || "Human rejection recorded; no GitHub review was published.";
+      } else {
+        const publication = result.publication_status || "not reported";
+        const detail = result.message ? ` ${result.message}` : "";
+        if (publication === "published") {
+          outcome = `Human approval recorded. A GitHub COMMENT review was published; no GitHub APPROVE event or merge was performed, and no code was changed.${detail}`;
+        } else {
+          outcome = `Human approval recorded. GitHub publication status: ${publication}. This does not mean the PR was approved or merged.${detail}`;
+          outcomeKind = "error";
+        }
+      }
+
+      await loadReviews();
+      setStatus(outcome, outcomeKind);
+    } catch (error) {
+      setStatus(`Decision request failed: ${error.message}`, "error");
+    }
+  }
+
+  function displayNumber(value, digits = 0) {
+    if (value === null || value === undefined || value === "") return "Not available";
+    const number = Number(value);
+    return Number.isFinite(number)
+      ? number.toLocaleString(undefined, {
+          maximumFractionDigits: digits,
+          minimumFractionDigits: digits,
+        })
+      : "Not available";
+  }
+
+  function displayMoney(value) {
+    if (value === null || value === undefined || value === "") return "Not available";
+    const number = Number(value);
+    return Number.isFinite(number) ? "$" + number.toFixed(4) : "Not available";
+  }
+
+  function renderTable(containerId, headings, rows, emptyMessage) {
+    const container = $(containerId);
+    container.replaceChildren();
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted small";
+      empty.textContent = emptyMessage;
+      container.appendChild(empty);
+      return;
+    }
+
+    const table = document.createElement("table");
+    table.className = "data-table";
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    for (const heading of headings) {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = heading;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    for (const values of rows) {
+      const tr = document.createElement("tr");
+      for (const value of values) {
+        const td = document.createElement("td");
+        td.textContent = value === null || value === undefined ? "Not available" : String(value);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  async function loadAnalytics() {
+    if (!token) {
+      setStatus("Enter your HITL API token before loading analytics.", "error");
+      return;
+    }
+
+    $("refresh-analytics").disabled = true;
+    $("analytics-daily-note").textContent = "Loading analytics…";
+    setStatus("Loading analytics…");
+    try {
+      const data = await api("/api/hitl/analytics");
+      const summary = data.summary || {};
+      const eventCount = Number(summary.agent_event_count || 0);
+      const knownCostEvents = Number(summary.cost_event_count || 0);
+      const unknownCostEvents = Number(summary.unknown_cost_event_count || 0);
+      const tokenEvents = Number(summary.token_usage_event_count || 0);
+
+      $("analytics-spend").textContent = displayMoney(summary.known_cost_usd);
+      $("analytics-spend-note").textContent =
+        `${knownCostEvents} priced event(s); ${unknownCostEvents} event(s) have unknown cost. Known total may be incomplete.`;
+
+      $("analytics-input").textContent = displayNumber(summary.tokens_in);
+      $("analytics-output").textContent = displayNumber(summary.tokens_out);
+      const usageNote = `Token usage recorded for ${tokenEvents} of ${eventCount} agent event(s).`;
+      $("analytics-input-note").textContent = usageNote;
+      $("analytics-output-note").textContent = usageNote;
+
+      $("analytics-pending").textContent = displayNumber(summary.pending_reviews);
+      $("analytics-cost-per-review").textContent =
+        displayMoney(summary.average_known_cost_per_review_usd);
+      $("analytics-cost-per-review-note").textContent =
+        `${displayNumber(summary.reviews_with_known_cost)} review record(s) with known cost; not necessarily a complete total.`;
+
+      const statuses = Array.isArray(data.review_statuses) ? data.review_statuses : [];
+      const recordCount = statuses.reduce((total, row) => total + Number(row.count || 0), 0);
+      $("analytics-review-records").textContent = displayNumber(recordCount);
+
+      $("analytics-latency").textContent = summary.average_latency_ms == null
+        ? "Not available"
+        : `${displayNumber(summary.average_latency_ms, 1)} ms`;
+
+      const daily = Array.isArray(data.daily) ? data.daily : [];
+      renderTable(
+        "analytics-daily",
+        ["Day", "Agent events", "Known cost (USD)", "Unknown-cost events", "Input tokens", "Output tokens"],
+        daily.map(row => [
+          row.day ? new Date(row.day).toLocaleDateString() : "Unknown date",
+          displayNumber(row.agent_event_count),
+          displayMoney(row.known_cost_usd),
+          displayNumber(row.unknown_cost_event_count),
+          displayNumber(row.tokens_in),
+          displayNumber(row.tokens_out),
+        ]),
+        "No agent-event usage was recorded in this period."
+      );
+      $("analytics-daily-note").textContent =
+        `Showing ${daily.length} day(s) with persisted agent events. Costs are estimates where token usage and model pricing are available.`;
+
+      renderTable(
+        "analytics-statuses",
+        ["Stored review status", "Count"],
+        statuses.map(row => [row.status || "Unknown", displayNumber(row.count)]),
+        "No review records were created in this period."
+      );
+
+      setStatus("Analytics loaded. Unknown values remain marked as unavailable.", "success");
+    } catch (error) {
+      $("analytics-daily-note").textContent =
+        `Could not load analytics: ${error.message}`;
+      setStatus(`Analytics request failed: ${error.message}`, "error");
+    } finally {
+      $("refresh-analytics").disabled = false;
+    }
+  }
+
+  $("nav-reviews").addEventListener("click", () => showPage("reviews"));
+  $("nav-analytics").addEventListener("click", () => { showPage("analytics"); loadAnalytics(); });
+  $("refresh-analytics").addEventListener("click", loadAnalytics);
+  $("connect").addEventListener("click", () => {
+    token = $("token").value.trim();
+    loadReviews();
+  });
+  $("refresh").addEventListener("click", loadReviews);
+  $("clear").addEventListener("click", () => {
+    token = "";
+    currentItems = [];
+    $("token").value = "";
+    $("pending-count").textContent = "—";
+    $("analytics-pending").textContent = "—";
+    for (const id of [
+      "analytics-spend", "analytics-input", "analytics-output",
+      "analytics-cost-per-review", "analytics-review-records", "analytics-latency",
+    ]) $(id).textContent = "Not loaded";
+    $("analytics-spend-note").textContent = "Estimated cost from recorded token usage and model pricing.";
+    $("analytics-input-note").textContent = "Token usage coverage will appear here.";
+    $("analytics-output-note").textContent = "Token usage coverage will appear here.";
+    $("analytics-cost-per-review-note").textContent = "May be incomplete when event costs are unknown.";
+    $("analytics-latency-note").textContent = "Across persisted agent events with latency measurements.";
+    $("analytics-daily-note").textContent = "Connect and load analytics to view daily totals.";
+    $("analytics-daily").replaceChildren();
+    $("analytics-statuses").replaceChildren();
+    $("reviews").replaceChildren();
+    setStatus("Token cleared. Not connected.");
+  });
+})();
+</script>
+</body>
+</html>

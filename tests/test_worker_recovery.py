@@ -24,7 +24,6 @@ def mock_worker_budget(monkeypatch):
 
 from backend.job_queue import arq_worker as worker
 
-
 REVIEW_ID = "11111111-1111-4111-8111-111111111111"
 HEAD_SHA = "a" * 40
 

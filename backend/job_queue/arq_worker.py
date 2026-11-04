@@ -1,33 +1,32 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from statistics import fmean
 from typing import Any
 
 from arq import cron
 from arq.connections import RedisSettings
 
+from backend.core.settings import settings
 from backend.economics.budget import (
     reserve_review_budget,
     settle_review_budget,
 )
 from backend.economics.pricing import calculate_cost_usd
-
-from backend.core.settings import settings
 from backend.integrations.diff_parser import parse_diff
 from backend.integrations.github_client import GitHubClient
-from backend.memory.tiger_client import TimescaleClient
-from backend.memory.repository_indexer import index_repository
 from backend.job_queue.webhook_dispatcher import dispatch_pending_webhooks
+from backend.memory.repository_indexer import index_repository
+from backend.memory.tiger_client import TimescaleClient
 from backend.observability.persistence import persist_agent_events
+from backend.orchestrator.graph import build_review_graph
+from backend.security.masking import mask_secrets
 from backend.webhook_receiver.inbox import (
     MAX_DELIVERY_ATTEMPTS,
     claim_delivery,
     mark_delivery,
 )
-from backend.orchestrator.graph import build_review_graph
-from backend.security.masking import mask_secrets
-
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ def validate_review_job(job: Any) -> dict[str, Any]:
     """Validate the internal payload before processing a PR."""
 
     if not isinstance(job, dict):
-        raise ValueError("Review job must be a dictionary.")
+        raise TypeError("Review job must be a dictionary.")
 
     installation_id = job.get("installation_id")
     repo = job.get("repo")
@@ -98,7 +97,7 @@ async def _persist_review(
 
     findings = review_result.get("findings", [])
     if not isinstance(findings, list):
-        raise ValueError("Review graph returned an invalid findings list.")
+        raise TypeError("Review graph returned an invalid findings list.")
 
     requested_status = review_result.get(
         "status", "human_review_required"
@@ -155,22 +154,21 @@ async def _persist_review(
     if pool is None:
         raise RuntimeError("Database connection pool is unavailable.")
 
-    async with pool.acquire() as connection:
-        async with connection.transaction():
-            await connection.execute(
-                """
+    async with pool.acquire() as connection, connection.transaction():
+        await connection.execute(
+            """
                 DELETE FROM finding_records
                 WHERE review_id = $1::uuid
                 """,
-                review_id,
-            )
+            review_id,
+        )
 
-            for finding in findings:
-                if not isinstance(finding, dict):
-                    raise ValueError("Invalid finding returned by graph.")
+        for finding in findings:
+            if not isinstance(finding, dict):
+                raise TypeError("Invalid finding returned by graph.")
 
-                await connection.execute(
-                    """
+            await connection.execute(
+                """
                     INSERT INTO finding_records (
                         review_id,
                         agent_type,
@@ -191,45 +189,45 @@ async def _persist_review(
                         $8, $9, $10, $11, $12, $13
                     )
                     """,
-                    review_id,
-                    finding["agent_type"],
-                    finding["severity"],
-                    finding.get("category"),
-                    finding["summary"],
-                    finding.get("file_path"),
-                    finding.get("line_start"),
-                    finding.get("line_end"),
-                    finding.get("suggestion"),
-                    finding.get("confidence"),
-                    finding.get("rationale"),
-                    finding.get("agreed_by") or [],
-                    finding.get("disputed", False),
-                )
-
-            await persist_agent_events(
-                connection,
-                installation_id=installation_id,
-                review_id=review_id,
-                agent_status=review_result.get("agent_status", {}),
-                findings=findings,
+                review_id,
+                finding["agent_type"],
+                finding["severity"],
+                finding.get("category"),
+                finding["summary"],
+                finding.get("file_path"),
+                finding.get("line_start"),
+                finding.get("line_end"),
+                finding.get("suggestion"),
+                finding.get("confidence"),
+                finding.get("rationale"),
+                finding.get("agreed_by") or [],
+                finding.get("disputed", False),
             )
 
-            await connection.execute(
-                """
+        await persist_agent_events(
+            connection,
+            installation_id=installation_id,
+            review_id=review_id,
+            agent_status=review_result.get("agent_status", {}),
+            findings=findings,
+        )
+
+        await connection.execute(
+            """
                 UPDATE pr_review_records
                 SET status = $2,
                     overall_confidence = $3,
                     updated_at = now()
                 WHERE id = $1::uuid
                 """,
-                review_id,
-                persisted_status,
-                overall_confidence,
-            )
+            review_id,
+            persisted_status,
+            overall_confidence,
+        )
 
-            if requires_human_review:
-                await connection.execute(
-                    """
+        if requires_human_review:
+            await connection.execute(
+                """
                     INSERT INTO hitl_reviews (
                         review_id, reason, status
                     )
@@ -237,9 +235,9 @@ async def _persist_review(
                     ON CONFLICT (review_id) WHERE status = 'pending'
                     DO UPDATE SET reason = EXCLUDED.reason
                     """,
-                    review_id,
-                    hitl_reason,
-                )
+                review_id,
+                hitl_reason,
+            )
 
     return persisted_status
 
@@ -288,7 +286,7 @@ def _actual_review_cost(
         except ValueError:
             return reserved_usd
 
-    return sum(costs, start=Decimal("0"))
+    return sum(costs, start=Decimal(0))
 
 
 async def run_review(ctx, job: dict) -> dict:
@@ -581,7 +579,8 @@ async def run_review(ctx, job: dict) -> dict:
 
         review_result = graph_output.get("result")
         if not isinstance(review_result, dict):
-            raise RuntimeError(
+            # The graph produced an invalid result, not an invalid caller argument.
+            raise RuntimeError(  # noqa: TRY004
                 "Review graph returned no valid aggregate result."
             )
 
@@ -640,7 +639,7 @@ async def run_review(ctx, job: dict) -> dict:
             )
             try:
                 await finish_inbox(inbox_status, type(exc).__name__)
-            except Exception as inbox_exc:
+            except Exception as inbox_exc:  # noqa: BLE001
                 logger.error(
                     "Could not update webhook inbox status (%s).",
                     type(inbox_exc).__name__,
@@ -661,7 +660,7 @@ async def run_review(ctx, job: dict) -> dict:
                     budget_reservation.reserved_usd,
                 )
                 budget_settled = True
-            except Exception as budget_exc:
+            except Exception as budget_exc:  # noqa: BLE001
                 logger.error(
                     "Could not settle failed review budget (%s).",
                     type(budget_exc).__name__,
@@ -680,7 +679,7 @@ async def run_review(ctx, job: dict) -> dict:
                     review_id,
                     delivery_id,
                 )
-            except Exception as status_exc:
+            except Exception as status_exc:  # noqa: BLE001
                 logger.error(
                     "Could not update failed review status (%s).",
                     type(status_exc).__name__,
@@ -697,7 +696,7 @@ async def reindex_repo(ctx, job: dict) -> dict:
     """Reindex the current default-branch snapshot after a push."""
 
     if not isinstance(job, dict):
-        raise ValueError("Reindex job must be a dictionary.")
+        raise TypeError("Reindex job must be a dictionary.")
 
     installation_id = job.get("installation_id")
     repo = job.get("repo")
@@ -849,7 +848,7 @@ async def reindex_repo(ctx, job: dict) -> dict:
             )
             try:
                 await finish_inbox(retry_status, type(exc).__name__)
-            except Exception as inbox_exc:
+            except Exception as inbox_exc:  # noqa: BLE001
                 logger.error(
                     "Could not update reindex inbox status (%s).",
                     type(inbox_exc).__name__,
@@ -891,7 +890,7 @@ async def shutdown(ctx):
 
 
 class WorkerSettings:
-    functions = [demo_job, run_review, reindex_repo]
+    functions = (demo_job, run_review, reindex_repo)
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     on_startup = startup
     on_shutdown = shutdown
@@ -899,10 +898,10 @@ class WorkerSettings:
     max_jobs = 5
 
     # Recover pending, failed and stale webhook deliveries every five minutes.
-    cron_jobs = [
+    cron_jobs = (
         cron(
             dispatch_pending_webhooks,
             minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55},
             unique=True,
-        )
-    ]
+        ),
+    )
